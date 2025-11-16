@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로또 번호 추첨기 v2</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inter 폰트 로드 */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* 로또 공 스타일 */
+        .lotto-ball {
+            width: 60px; /* 크기 살짝 줄임 */
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.25rem; /* 20px */
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            transition: all 0.3s ease;
+            transform: scale(0.8);
+            opacity: 0;
+        }
+
+        /* 번호별 공 색상 */
+        .ball-color-1 { background: linear-gradient(135deg, #FAD961 0%, #F76B1C 100%); } /* 1-10 (노랑) */
+        .ball-color-2 { background: linear-gradient(135deg, #A1C4FD 0%, #C2E9FB 100%); } /* 11-20 (파랑) */
+        .ball-color-3 { background: linear-gradient(135deg, #FF8177 0%, #FF867A 0%, #FF8C7F 21%, #F99185 52%, #CF556C 78%, #B12A5B 100%); } /* 21-30 (빨강) */
+        .ball-color-4 { background: linear-gradient(135deg, #485461 0%, #28313B 100%); } /* 31-40 (검정/회색) */
+        .ball-color-5 { background: linear-gradient(135deg, #ABDCFF 0%, #0396FF 100%); } /* 41-45 (초록색 대신 다른 파랑) */
+
+        /* 보너스 공 '+' 기호 */
+        .bonus-plus {
+            font-size: 2rem; /* 32px */
+            font-weight: 300;
+            color: #9CA3AF; /* gray-400 */
+        }
+
+        /* 추첨 버튼 */
+        #generate-btn {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(66, 153, 225, 0.4);
+        }
+        #generate-btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 6px 20px rgba(66, 153, 225, 0.5);
+        }
+        #generate-btn:active {
+            transform: translateY(0) scale(1);
+        }
+
+        /* 번호가 나타나는 애니메이션 */
+        .ball-appear {
+            animation: ball-pop 0.5s ease-out forwards;
+        }
+
+        @keyframes ball-pop {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            70% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-xl w-full bg-white rounded-2xl shadow-xl p-6 md:p-8 text-center">
+        
+        <!-- 제목 -->
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
+            🍀 행운의 로또 추첨기 🍀
+        </h1>
+        <p class="text-gray-500 mb-6">버튼을 눌러 행운의 번호를 확인하세요!</p>
+
+        <!-- 랜덤 이미지가 표시될 영역 -->
+        <div id="large-image-container" class="mb-6 hidden transition-all duration-300 ease-out">
+            <img id="large-random-img" src="" alt="행운의 이미지" class="w-full max-w-sm mx-auto rounded-lg shadow-lg">
+        </div>
+
+        <!-- 로또 공이 표시될 영역 -->
+        <div id="lotto-balls" class="flex flex-wrap justify-center items-center gap-2 md:gap-3 mb-8 min-h-[70px]">
+            <!-- JS로 여기에 공이 생성됩니다 -->
+        </div>
+
+        <!-- 추첨 버튼 -->
+        <button id="generate-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-xl text-lg md:text-xl">
+            번호 추첨하기
+        </button>
+    </div>
+
+    <script>
+        // --- 설정 ---
+        // 여기에 표시할 이미지 경로 목록을 추가하세요.
+        // '재용이형.jpg'는 실제 서버 경로(예: './images/my-image.jpg')로 변경해야 합니다.
+        const imageSources = ['https://i.imgur.com/iHkqZez.jpeg' // <-- 1. 여기에 업로드한 이미지의 '직접 링크' URL을 붙여넣으세요.
+            // 2. '재용이형.jpg' 경로는 삭제하거나 이처럼 웹 주소로 변경합니다.
+        ];
+
+        // --- 요소 선택 ---
+        const ballContainer = document.getElementById('lotto-balls');
+        const generateBtn = document.getElementById('generate-btn');
+        const largeImageContainer = document.getElementById('large-image-container');
+        const largeRandomImg = document.getElementById('large-random-img');
+
+        // --- 이벤트 리스너 ---
+        generateBtn.addEventListener('click', startLottoDraw);
+
+        // --- 함수 ---
+
+        // 로또 추첨 시작
+        function startLottoDraw() {
+            // 버튼 비활성화
+            generateBtn.disabled = true;
+            generateBtn.textContent = '추첨 중...';
+            generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // 기존 공 및 이미지 초기화
+            ballContainer.innerHTML = '';
+            largeImageContainer.classList.add('hidden'); // 이미지 숨기기
+            largeImageContainer.classList.add('opacity-0');
+            
+            // 7개의 고유 번호 생성
+            const numbers = generateUniqueNumbers(7, 1, 45);
+            
+            // 이미지와 번호 표시
+            displayImageAndNumbers(numbers);
+        }
+
+        // 고유 번호 생성
+        function generateUniqueNumbers(count, min, max) {
+            const numbers = new Set();
+            while (numbers.size < count) {
+                const num = Math.floor(Math.random() * (max - min + 1)) + min;
+                numbers.add(num);
+            }
+            return Array.from(numbers);
+        }
+
+        // 번호별 공 색상 반환
+        function getBallColorClass(number) {
+            if (number <= 10) return 'ball-color-1';
+            if (number <= 20) return 'ball-color-2';
+            if (number <= 30) return 'ball-color-3';
+            if (number <= 40) return 'ball-color-4';
+            return 'ball-color-5'; // 41-45
+        }
+
+        // (수정됨) 이미지와 번호를 순차적으로 표시
+        function displayImageAndNumbers(numbers) {
+            
+            // 1. 랜덤 이미지 선택
+            const randomImgSrc = imageSources[Math.floor(Math.random() * imageSources.length)];
+            largeRandomImg.src = randomImgSrc;
+
+            // 이미지 에러 처리
+            largeRandomImg.onerror = () => {
+                largeRandomImg.src = `https://placehold.co/400x300/7F8C8D/FFFFFF?text=Error`;
+            };
+
+            // 2. 이미지 표시 (약간의 딜레이 후)
+            setTimeout(() => {
+                largeImageContainer.classList.remove('hidden');
+                setTimeout(() => { // 페이드인 효과
+                    largeImageContainer.classList.remove('opacity-0');
+                }, 10);
+            }, 200); // 0.2초 후 이미지 표시
+
+            // 3. 번호 정렬
+            const mainNumbers = numbers.slice(0, 6).sort((a, b) => a - b);
+            const bonusNumber = numbers[6];
+            const allNumbers = [...mainNumbers, bonusNumber];
+
+            let delay = 800; // 이미지 표시 후 번호가 나오기 시작하는 딜레이
+            const delayIncrement = 400; // 각 번호 사이의 시간 (ms)
+
+            // 4. 번호 순차적 표시
+            allNumbers.forEach((num, index) => {
+                setTimeout(() => {
+                    // 보너스 공 앞 '+' 기호 추가
+                    if (index === 6) {
+                        const plusSign = document.createElement('div');
+                        plusSign.className = 'bonus-plus mx-1 md:mx-2';
+                        plusSign.textContent = '+';
+                        ballContainer.appendChild(plusSign);
+                    }
+                    
+                    // 공 요소 생성
+                    const ball = document.createElement('div');
+                    ball.className = `lotto-ball ${getBallColorClass(num)}`;
+                    ball.textContent = num;
+                    
+                    ballContainer.appendChild(ball);
+                    ball.classList.add('ball-appear'); // 애니메이션 클래스 추가
+
+                }, delay);
+
+                delay += delayIncrement;
+            });
+
+            // 5. 모든 추첨이 끝난 후 버튼 활성화
+            setTimeout(() => {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '다시 추첨하기';
+                generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }, delay);
+        }
+    </script>
+
+</body>
+</html>
